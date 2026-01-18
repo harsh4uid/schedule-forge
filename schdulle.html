@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Schedule Forge</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white text-black">
+
+<!-- =========================
+  PAGE 1: WELCOME (VIDEO + CTA)
+========================= -->
+<section id="welcome" class="h-screen flex">
+  <div class="w-1/0.5bg-black">
+    <video src="a_cartoon_style_character_like_25_year.mp4" autoplay loop muted playsinline class="w-full h-full object-cover"></video>
+  </div>
+  <div class="w-3/5 flex items-center justify-center">
+    <div class="text-center">
+      <h1 class="text-4xl italic mb-6">welcome schedule <br> forge</h1>
+      <button onclick="goToInput()" class="bg-black text-white px-8 py-2 rounded italic hover:bg-yellow-400 hover:text-black transition">
+        let's go
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- =========================
+  PAGE 2: INPUT SUBJECTS
+========================= -->
+<section id="input" class="hidden min-h-screen flex items-center justify-center">
+  <div class="bg-[#eee9dd] w-[750px] p-8 rounded-2xl shadow">
+
+    <h2 class="text-2xl italic mb-4">Enter Subjects</h2>
+
+    <div class="grid grid-cols-3 gap-4 bg-[#fde68a] px-6 py-3 rounded italic">
+      <div>Subject</div>
+      <div>Difficulty (1-5)</div>
+      <div>Importance (1-5)</div>
+    </div>
+
+    <div id="rows" class="space-y-3 mt-3"></div>
+
+    <div class="mt-4">
+      <label class="block mb-1">Total Study Time (hours)</label>
+      <input id="totalTime" type="number" value="6" class="px-3 py-2 rounded w-40" />
+    </div>
+
+    <div class="flex gap-4 mt-6">
+      <button onclick="addRow()" class="bg-black text-white px-5 py-2 rounded hover:bg-yellow-400 hover:text-black transition">Add Subject</button>
+      <button onclick="generateSchedule()" class="bg-yellow-400 text-black px-5 py-2 rounded">Submit</button>
+    </div>
+  </div>
+</section>
+
+<!-- =========================
+  PAGE 3: SCHEDULE RESULT
+========================= -->
+<section id="result" class="hidden min-h-screen flex items-center justify-center">
+  <div class="bg-[#eee9dd] w-[750px] p-8 rounded-2xl shadow">
+    <h2 class="text-2xl italic mb-6 text-center">Optimized Schedule</h2>
+
+    <div id="scheduleList" class="space-y-3"></div>
+
+    <button onclick="goToWork()" class="mt-6 bg-black text-white px-6 py-2 rounded hover:bg-yellow-400 hover:text-black transition">
+      Let's Work
+    </button>
+  </div>
+</section>
+
+<!-- =========================
+  PAGE 4: FOCUS MODE
+========================= -->
+<section id="work" class="hidden h-screen flex">
+
+  <!-- Graph -->
+  <div id="graph" class="w-2/3 flex items-end justify-center gap-10 p-10"></div>
+
+  <!-- Timer & Controls -->
+  <div class="w-1/3 flex flex-col items-center justify-center gap-6">
+    <div id="currentSubject" class="text-xl italic"></div>
+    <div id="timer" class="text-6xl font-mono">00:00</div>
+
+    <div class="flex gap-4">
+      <button onclick="pause()" class="px-4 py-2 bg-gray-300 rounded">Pause</button>
+      <button onclick="resume()" class="px-4 py-2 bg-gray-300 rounded">Continue</button>
+    </div>
+
+    <button onclick="terminate()" class="px-6 py-2 bg-black text-white rounded">Submit / End</button>
+  </div>
+</section>
+
+<script>
+/* =========================
+   GLOBAL STATE
+========================= */
+let subjects = [];
+let current = 0;
+let elapsed = 0;
+let interval = null;
+let paused = false;
+
+/* =========================
+   NAVIGATION
+========================= */
+function goToInput() {
+  welcome.classList.add('hidden');
+  input.classList.remove('hidden');
+}
+
+function goToResult() {
+  input.classList.add('hidden');
+  result.classList.remove('hidden');
+}
+
+function goToWork() {
+  result.classList.add('hidden');
+  work.classList.remove('hidden');
+  buildGraph();
+  startFocus();
+}
+
+/* =========================
+   INPUT PAGE LOGIC
+========================= */
+function addRow() {
+  const row = document.createElement('div');
+  row.className = 'row grid grid-cols-3 gap-4 bg-[#fde68a] px-6 py-2 rounded';
+
+  row.innerHTML = `
+    <input class="name px-2 py-1 rounded" placeholder="Subject" />
+    <select class="diff px-2 py-1 rounded">${[1,2,3,4,5].map(n=>`<option>${n}</option>`).join('')}</select>
+    <select class="imp px-2 py-1 rounded">${[1,2,3,4,5].map(n=>`<option>${n}</option>`).join('')}</select>
+  `;
+
+  rows.appendChild(row);
+}
+addRow();
+
+function generateSchedule() {
+  const totalHours = Number(document.getElementById('totalTime').value);
+  const allRows = document.querySelectorAll('.row');
+
+  subjects = [];
+  let totalScore = 0;
+
+  allRows.forEach(r => {
+    const name = r.querySelector('.name').value;
+    const diff = +r.querySelector('.diff').value;
+    const imp = +r.querySelector('.imp').value;
+    if (!name) return;
+
+    const score = diff * imp;
+    totalScore += score;
+
+    subjects.push({ name, diff, imp, score });
+  });
+
+  subjects.forEach(s => {
+    s.minutes = Math.round((s.score / totalScore) * totalHours * 60);
+  });
+
+  showSchedule();
+  goToResult();
+}
+
+function showSchedule() {
+  scheduleList.innerHTML = '';
+  subjects.forEach(s => {
+    scheduleList.innerHTML += `
+      <div class="bg-[#fde68a] px-6 py-2 rounded flex justify-between">
+        <span>${s.name}</span>
+        <span>${s.minutes} min</span>
+      </div>`;
+  });
+}
+
+/* =========================
+   GRAPH + FOCUS MODE
+========================= */
+function buildGraph() {
+  graph.innerHTML = '';
+  const max = Math.max(...subjects.map(s => s.minutes));
+
+  subjects.forEach(s => {
+    const height = (s.minutes / max) * 200;
+
+    graph.innerHTML += `
+      <div class="flex flex-col items-center">
+        <div class="w-14 h-64 bg-gray-200 rounded overflow-hidden relative">
+          <div id="bar-${s.name}" class="bg-yellow-400 w-full absolute bottom-0 h-0 transition-all"></div>
+        </div>
+        <p class="mt-2">${s.name}</p>
+      </div>`;
+  });
+}
+
+function startFocus() {
+  current = 0;
+  elapsed = 0;
+  runSubject();
+}
+
+function runSubject() {
+  if (current >= subjects.length) {
+    new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play();
+    alert('All tasks completed!');
+    return;
+  }
+
+  const subject = subjects[current];
+  currentSubject.textContent = subject.name;
+
+  const bar = document.getElementById('bar-' + subject.name);
+  const total = subject.minutes * 60;
+
+  clearInterval(interval);
+  elapsed = 0;
+
+  interval = setInterval(() => {
+    if (paused) return;
+
+    elapsed++;
+    timer.textContent = format(elapsed);
+
+    const percent = (elapsed / total) * 100;
+    bar.style.height = percent + '%';
+
+    if (elapsed >= total) {
+      clearInterval(interval);
+      current++;
+      runSubject();
+    }
+  }, 1000);
+}
+
+function format(sec) {
+  const m = String(Math.floor(sec / 60)).padStart(2, '0');
+  const s = String(sec % 60).padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function pause() { paused = true; }
+function resume() { paused = false; }
+function terminate() {
+  clearInterval(interval);
+  alert('Session ended');
+}
+</script>
+
+</body>
+</html>
